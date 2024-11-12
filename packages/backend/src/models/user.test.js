@@ -12,6 +12,11 @@ import Step from './step.js';
 import Subscription from './subscription.ee.js';
 import UsageData from './usage-data.ee.js';
 import User from './user.js';
+import emailQueue from '../queues/email.js';
+import {
+  REMOVE_AFTER_30_DAYS_OR_150_JOBS,
+  REMOVE_AFTER_7_DAYS_OR_50_JOBS,
+} from '../helpers/remove-job-configuration.js';
 import { createUser } from '../../test/factories/user.js';
 import { createConnection } from '../../test/factories/connection.js';
 import { createRole } from '../../test/factories/role.js';
@@ -603,5 +608,50 @@ describe('User model', () => {
         })
       ).rejects.toThrowError('currentPassword: is incorrect.');
     });
+  });
+
+  it('sendInvitationEmail should generate invitation token and queue to send invitation email', async () => {
+    vi.useFakeTimers();
+
+    const date = new Date(2024, 10, 12, 17, 10, 0, 0);
+    vi.setSystemTime(date);
+
+    const user = await createUser();
+
+    const generateInvitationTokenSpy = vi
+      .spyOn(user, 'generateInvitationToken')
+      .mockReturnValue();
+
+    const emailQueueAddSpy = vi.spyOn(emailQueue, 'add').mockResolvedValue();
+
+    await user.sendInvitationEmail();
+
+    const refetchedUser = await user.$query();
+    const jobName = `Invitation Email - ${refetchedUser.id}`;
+
+    const jobPayload = {
+      email: refetchedUser.email,
+      subject: 'You are invited!',
+      template: 'invitation-instructions',
+      params: {
+        fullName: refetchedUser.fullName,
+        acceptInvitationUrl: refetchedUser.acceptInvitationUrl,
+      },
+    };
+
+    const jobOptions = {
+      removeOnComplete: REMOVE_AFTER_7_DAYS_OR_50_JOBS,
+      removeOnFail: REMOVE_AFTER_30_DAYS_OR_150_JOBS,
+    };
+
+    expect(generateInvitationTokenSpy).toHaveBeenCalledOnce();
+
+    expect(emailQueueAddSpy).toHaveBeenCalledWith(
+      jobName,
+      jobPayload,
+      jobOptions
+    );
+
+    vi.useRealTimers();
   });
 });
