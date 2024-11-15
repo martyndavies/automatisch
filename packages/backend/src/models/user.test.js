@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { DateTime } from 'luxon';
 import appConfig from '../config/app.js';
 import Base from './base.js';
 import AccessToken from './access-token.js';
@@ -19,6 +20,7 @@ import { createPermission } from '../../test/factories/permission.js';
 import { createFlow } from '../../test/factories/flow.js';
 import { createStep } from '../../test/factories/step.js';
 import { createExecution } from '../../test/factories/execution.js';
+import { createSubscription } from '../../test/factories/subscription.js';
 
 describe('User model', () => {
   it('tableName should return correct name', () => {
@@ -602,6 +604,35 @@ describe('User model', () => {
           password: 'new-password',
         })
       ).rejects.toThrowError('currentPassword: is incorrect.');
+    });
+  });
+
+  describe('hasActiveSubscription', () => {
+    it('should return true if current subscription is valid', async () => {
+      const user = await createUser();
+      await createSubscription({ userId: user.id, status: 'active' });
+
+      expect(await user.hasActiveSubscription()).toBe(true);
+    });
+
+    it('should return false if current subscription is not valid', async () => {
+      const user = await createUser();
+
+      await createSubscription({
+        userId: user.id,
+        status: 'deleted',
+        cancellationEffectiveDate: DateTime.now().minus({ day: 1 }).toString(),
+      });
+
+      expect(await user.hasActiveSubscription()).toBe(false);
+    });
+
+    it('should return false if Automatisch is not a cloud installation', async () => {
+      const user = new User();
+
+      vi.spyOn(appConfig, 'isCloud', 'get').mockReturnValue(false);
+
+      expect(await user.hasActiveSubscription()).toBe(false);
     });
   });
 });
