@@ -19,6 +19,8 @@ import { createPermission } from '../../test/factories/permission.js';
 import { createFlow } from '../../test/factories/flow.js';
 import { createStep } from '../../test/factories/step.js';
 import { createExecution } from '../../test/factories/execution.js';
+import { createSubscription } from '../../test/factories/subscription.js';
+import { createUsageData } from '../../test/factories/usage-data.js';
 
 describe('User model', () => {
   it('tableName should return correct name', () => {
@@ -602,6 +604,34 @@ describe('User model', () => {
           password: 'new-password',
         })
       ).rejects.toThrowError('currentPassword: is incorrect.');
+    });
+  });
+
+  describe('withinLimits', () => {
+    it('should return true when the consumed task count is less than the quota', async () => {
+      const user = await createUser();
+      const subscription = await createSubscription({ userId: user.id });
+
+      await createUsageData({
+        subscriptionId: subscription.id,
+        userId: user.id,
+        consumedTaskCount: 100,
+      });
+
+      expect(await user.withinLimits()).toBe(true);
+    });
+
+    it('should return true when the consumed task count is less than the quota', async () => {
+      const user = await createUser();
+      const subscription = await createSubscription({ userId: user.id });
+
+      await createUsageData({
+        subscriptionId: subscription.id,
+        userId: user.id,
+        consumedTaskCount: 10000,
+      });
+
+      expect(await user.withinLimits()).toBe(false);
     });
   });
 });
