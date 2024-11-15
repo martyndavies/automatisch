@@ -604,4 +604,76 @@ describe('User model', () => {
       ).rejects.toThrowError('currentPassword: is incorrect.');
     });
   });
+
+  describe('inTrial', () => {
+    it('should return false when Automatisch is self hosted', async () => {
+      const user = new User();
+
+      vi.spyOn(appConfig, 'isSelfHosted', 'get').mockReturnValue(true);
+
+      expect(await user.inTrial()).toBe(false);
+    });
+
+    it('should return false when the user does not have trial expiry date', async () => {
+      const user = new User();
+
+      vi.spyOn(appConfig, 'isSelfHosted', 'get').mockReturnValue(false);
+
+      expect(await user.inTrial()).toBe(false);
+    });
+
+    it('should return false when the user has an active subscription', async () => {
+      const user = new User();
+      user.trialExpiryDate = '2024-12-14';
+
+      vi.spyOn(appConfig, 'isSelfHosted', 'get').mockReturnValue(false);
+
+      const hasActiveSubscriptionSpy = vi
+        .spyOn(user, 'hasActiveSubscription')
+        .mockResolvedValue(true);
+
+      expect(await user.inTrial()).toBe(false);
+      expect(hasActiveSubscriptionSpy).toHaveBeenCalledOnce();
+    });
+
+    it('should return true when trial expiry date is in future', async () => {
+      vi.useFakeTimers();
+
+      const date = new Date(2024, 10, 12, 17, 30, 0, 0);
+      vi.setSystemTime(date);
+
+      const user = await createUser();
+
+      await user.startTrialPeriod();
+
+      const refetchedUser = await user.$query();
+
+      vi.spyOn(appConfig, 'isSelfHosted', 'get').mockReturnValue(false);
+      vi.spyOn(refetchedUser, 'hasActiveSubscription').mockResolvedValue(false);
+
+      expect(await refetchedUser.inTrial()).toBe(true);
+
+      vi.useRealTimers();
+    });
+
+    it('should return false when trial expiry date is in past', async () => {
+      vi.useFakeTimers();
+
+      const user = await createUser();
+
+      await user.startTrialPeriod();
+
+      const date = new Date(2024, 12, 17, 11, 30, 0, 0);
+      vi.setSystemTime(date);
+
+      const refetchedUser = await user.$query();
+
+      vi.spyOn(appConfig, 'isSelfHosted', 'get').mockReturnValue(false);
+      vi.spyOn(refetchedUser, 'hasActiveSubscription').mockResolvedValue(false);
+
+      expect(await refetchedUser.inTrial()).toBe(false);
+
+      vi.useRealTimers();
+    });
+  });
 });
