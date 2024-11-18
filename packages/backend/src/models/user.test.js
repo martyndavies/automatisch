@@ -19,6 +19,7 @@ import { createPermission } from '../../test/factories/permission.js';
 import { createFlow } from '../../test/factories/flow.js';
 import { createStep } from '../../test/factories/step.js';
 import { createExecution } from '../../test/factories/execution.js';
+import { createSubscription } from '../../test/factories/subscription.js';
 
 describe('User model', () => {
   it('tableName should return correct name', () => {
@@ -602,6 +603,48 @@ describe('User model', () => {
           password: 'new-password',
         })
       ).rejects.toThrowError('currentPassword: is incorrect.');
+    });
+  });
+
+  describe('getPlanAndUsage', () => {
+    it('should return plan and usage', async () => {
+      const user = await createUser();
+
+      const subscription = await createSubscription({ userId: user.id });
+
+      expect(await user.getPlanAndUsage()).toStrictEqual({
+        usage: {
+          task: 0,
+        },
+        plan: {
+          id: subscription.paddlePlanId,
+          name: '10k - monthly',
+          limit: '10,000',
+        },
+      });
+    });
+
+    it('should return trial plan and usage if no subscription exists', async () => {
+      const user = await createUser();
+
+      expect(await user.getPlanAndUsage()).toStrictEqual({
+        usage: {
+          task: 0,
+        },
+        plan: {
+          id: null,
+          name: 'Free Trial',
+          limit: null,
+        },
+      });
+    });
+
+    it('should throw not found when the current usage data does not exist', async () => {
+      vi.spyOn(appConfig, 'isCloud', 'get').mockReturnValue(false);
+
+      const user = await createUser();
+
+      expect(() => user.getPlanAndUsage()).rejects.toThrow('NotFoundError');
     });
   });
 });
