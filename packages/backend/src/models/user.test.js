@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import appConfig from '../config/app.js';
 import Base from './base.js';
 import AccessToken from './access-token.js';
+import Config from './config.js';
 import Connection from './connection.js';
 import Execution from './execution.js';
 import Flow from './flow.js';
@@ -603,5 +604,30 @@ describe('User model', () => {
         })
       ).rejects.toThrowError('currentPassword: is incorrect.');
     });
+  });
+
+  it.todo('getApps');
+
+  it('createAdmin should create admin with given data and mark the installation completed', async () => {
+    const adminRole = await createRole({ name: 'Admin' });
+
+    const markInstallationCompletedSpy = vi
+      .spyOn(Config, 'markInstallationCompleted')
+      .mockResolvedValue();
+
+    const adminUser = await User.createAdmin({
+      fullName: 'Sample admin',
+      email: 'admin@automatisch.io',
+      password: 'sample',
+    });
+
+    expect(adminUser).toMatchObject({
+      fullName: 'Sample admin',
+      email: 'admin@automatisch.io',
+      roleId: adminRole.id,
+    });
+
+    expect(markInstallationCompletedSpy).toHaveBeenCalledOnce();
+    expect(await adminUser.login('sample')).toBe(true);
   });
 });
