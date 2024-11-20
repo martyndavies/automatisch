@@ -583,10 +583,16 @@ class User extends Base {
     return user;
   }
 
+  lowercaseEmail() {
+    if (this.email) {
+      this.email = this.email.toLowerCase();
+    }
+  }
+
   async $beforeInsert(queryContext) {
     await super.$beforeInsert(queryContext);
 
-    this.email = this.email.toLowerCase();
+    this.lowercaseEmail();
     await this.generateHash();
 
     if (appConfig.isCloud) {
@@ -597,9 +603,7 @@ class User extends Base {
   async $beforeUpdate(opt, queryContext) {
     await super.$beforeUpdate(opt, queryContext);
 
-    if (this.email) {
-      this.email = this.email.toLowerCase();
-    }
+    this.lowercaseEmail();
 
     await this.generateHash();
   }
